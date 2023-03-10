@@ -22,7 +22,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class OrderService {
 	
 	private final OrderRepository orderRepository;
-	private final WebClient webClient;
+	private final WebClient.Builder webClientBuilder;
 	private String skuCodeList;
 	
 	public void placeOrder(OrderRequest orderRequest) {
@@ -38,8 +38,8 @@ public class OrderService {
 		order.setOrderLineItemsList(orderLineItems);
 
 		/** call inventory service and place order if product in stock */
-		Boolean isInStock = webClient.get()
-				.uri("http://localhost:8082/api/inventory", uriBuilder -> uriBuilder.queryParam("skuCode", skuCodeList).build())
+		Boolean isInStock = webClientBuilder.build().get()
+				.uri("http://inventory-service/api/inventory", uriBuilder -> uriBuilder.queryParam("skuCode", skuCodeList).build())
 				.retrieve()
 				.bodyToMono(Boolean.class)
 				.block();
