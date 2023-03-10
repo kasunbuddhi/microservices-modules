@@ -13,6 +13,8 @@ import com.programmingtechie.orderservice.model.OrderLineItems;
 import com.programmingtechie.orderservice.repository.OrderRepository;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @Service
 @RequiredArgsConstructor
@@ -20,8 +22,11 @@ import lombok.RequiredArgsConstructor;
 public class OrderService {
 	
 	private final OrderRepository orderRepository;
+	private final WebClient webClient;
+	private String skuCodeList;
 	
 	public void placeOrder(OrderRequest orderRequest) {
+		skuCodeList = "";
 		Order order = new Order();
 		order.setOrderNumber(UUID.randomUUID().toString());
 		
@@ -31,8 +36,20 @@ public class OrderService {
 		.toList();
 		
 		order.setOrderLineItemsList(orderLineItems);
-		
-		orderRepository.save(order);
+
+		/** call inventory service and place order if product in stock */
+		Boolean isInStock = webClient.get()
+				.uri("http://localhost:8082/api/inventory/" + skuCodeList)
+				.retrieve()
+				.bodyToMono(Boolean.class)
+				.block();
+
+		if (isInStock) {
+			orderRepository.save(order);
+		} else {
+			throw new IllegalArgumentException(order.getOrderLineItemsList().get(0).getSkuCode() + " not in stocks");
+		}
+
 	}
 
 	private OrderLineItems mapToOrder(OrderLineItemsDto dto) {
@@ -40,6 +57,11 @@ public class OrderService {
 		items.setPrice(dto.getPrice());
 		items.setSkuCode(dto.getSkuCode());
 		items.setQuantity(dto.getQuantity());
+		if(StringUtils.hasText(skuCodeList)){
+			skuCodeList += "," + dto.getSkuCode();
+		} else {
+			skuCodeList = dto.getSkuCode();
+		}
 		
 		return items;
 	}
